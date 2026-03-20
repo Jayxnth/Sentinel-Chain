@@ -1,0 +1,7 @@
+chromadb
+langchain
+langchain-google-genai
+langchain-huggingface
+sentence-transformers
+python-dotenv
+langchain-community

@@ -1,0 +1,17 @@
+```
+.env
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+chroma_db/
+*.db
+*.sqlite
+.DS_Store
+Thumbs.db
+*.egg-info/
+dist/
+build/
+```

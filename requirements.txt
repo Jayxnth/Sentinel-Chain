@@ -7,3 +7,6 @@ python-dotenv
 langchain-community
 sqlalchemy[asyncio]
 asyncpg
+fastapi
+uvicorn[standard]
+aiosqlite

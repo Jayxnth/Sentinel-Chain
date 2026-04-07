@@ -1,0 +1,10 @@
+{
+  "backend_url": "http://localhost:8000",
+  "api_key": "changeme",
+  "source_vm": "vm1-linux",
+  "poll_interval_seconds": 60,
+  "log_sources": [
+    {"path": "/var/log/auth.log", "log_type": "intrusion"},
+    {"path": "/var/log/apache2/access.log", "log_type": "web"}
+  ]
+}

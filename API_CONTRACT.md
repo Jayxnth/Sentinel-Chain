@@ -10,6 +10,7 @@ This document defines all backend endpoints for the Sentinel-Chain project. It i
 ## Table of Contents
 
 - [POST /ingest](#post-ingest)
+- [GET /batches](#get-batches)
 - [GET /reports](#get-reports)
 - [POST /query](#post-query)
 - [GET /integrity](#get-integrity)
@@ -20,7 +21,7 @@ This document defines all backend endpoints for the Sentinel-Chain project. It i
 
 ## POST /ingest
 
-Ingest a log batch from a VM, run AI analysis, and store the result on-chain.
+Ingest a log batch from a VM, verify chain integrity, and store the result on-chain. AI analysis runs asynchronously in the background; the agent should poll `GET /reports?batch_id=<batch_id>` to check whether a report has been generated.
 
 ### Headers
 
@@ -47,7 +48,7 @@ Ingest a log batch from a VM, run AI analysis, and store the result on-chain.
 | log_type   | string | Yes      | Category of log. Accepted values: `"malware"`, `"intrusion"`, `"web"`, `"http"`. The backend returns `400` if an unrecognized value is provided. |
 | content    | string | Yes      | Raw log content to be analyzed                   |
 | filename   | string | Yes      | Original filename of the log                     |
-| ts         | string | Yes      | Timestamp of the log entry in ISO 8601 format (e.g. `"2026-04-04T12:00:00Z"`). This is the agent-reported collection time. The backend trusts this value for timeline ordering. |
+| ts         | string | Yes      | Timestamp of the log batch collection time in ISO 8601 format (e.g. `"2026-04-04T12:00:00Z"`). This is the agent-reported collection time. The backend trusts this value for timeline ordering. |
 
 ### Example Request
 
@@ -66,26 +67,96 @@ Ingest a log batch from a VM, run AI analysis, and store the result on-chain.
 ```json
 {
   "batch_id": 42,
-  "integrity_status": "VERIFIED",
-  "report_id": 17
+  "integrity_status": "VERIFIED"
 }
 ```
 
-| Field            | Type         | Description                                                |
-|------------------|--------------|------------------------------------------------------------|
-| batch_id         | integer      | Unique ID of the ingested log batch stored on-chain        |
-| integrity_status | string       | `"VERIFIED"` if the chain is intact, `"TAMPERED"` if not, `"ERROR"` if the integrity check itself failed (e.g. database read error). On `"ERROR"`, the batch is still stored but not analyzed. |
-| report_id        | integer\|null | ID of the AI-generated analysis report. `null` if `integrity_status` is `"TAMPERED"` or `"ERROR"`, or if AI analysis failed. |
+| Field            | Type    | Description                                                |
+|------------------|---------|------------------------------------------------------------|
+| batch_id         | integer | Unique ID of the ingested log batch stored on-chain        |
+| integrity_status | string  | `"VERIFIED"` if the chain is intact, `"TAMPERED"` if not, `"ERROR"` if the integrity check itself failed (e.g. database read error). On `"ERROR"`, the batch is still stored but not analyzed. |
 
 ### Status Codes
 
 | Code | Meaning                                              |
 |------|------------------------------------------------------|
-| 200  | Log ingested successfully. Check `integrity_status` and `report_id` in the response body for the outcome of integrity verification and AI analysis. |
+| 200  | Log ingested successfully. Check `integrity_status` in the response body for the outcome of integrity verification. AI analysis runs asynchronously - poll `GET /reports?batch_id=<batch_id>` to retrieve results. |
 | 400  | Malformed request body or missing required fields    |
 | 401  | Missing or invalid `X-API-Key`                       |
 | 500  | Internal server error during ingestion (batch was NOT stored) |
 | 503  | Database unavailable                                 |
+
+---
+
+## GET /batches
+
+Retrieve a paginated, chronological list of all ingestion events. Includes both `VERIFIED` and `TAMPERED` batches.
+
+### Headers
+
+| Header    | Required | Description            |
+|-----------|----------|------------------------|
+| X-API-Key | Yes      | API authentication key |
+
+### Query Parameters
+
+| Parameter | Type    | Required | Default | Description                                |
+|-----------|---------|----------|---------|--------------------------------------------|
+| source_vm | string  | No       | -       | Filter by source VM identifier             |
+| page      | integer | No       | `1`     | Page number for pagination                 |
+| page_size | integer | No       | `20`    | Number of results per page (max `100`)     |
+
+### Example Request
+
+```
+GET /batches?source_vm=vm-prod-01&page=1&page_size=20
+```
+
+### Response Body
+
+```json
+{
+  "results": [
+    {
+      "id": 42,
+      "source_vm": "vm-prod-01",
+      "log_type": "intrusion",
+      "filename": "auth.log",
+      "integrity_status": "VERIFIED",
+      "ts": "2026-04-04T12:00:00Z"
+    }
+  ],
+  "total": 1,
+  "page": 1,
+  "page_size": 20
+}
+```
+
+| Field     | Type    | Description                                          |
+|-----------|---------|------------------------------------------------------|
+| results   | array   | Array of batch objects for the current page           |
+| total     | integer | Total number of batches matching the applied filters  |
+| page      | integer | Current page number                                   |
+| page_size | integer | Number of results per page                            |
+
+**Batch object fields:**
+
+| Field            | Type    | Description                                      |
+|------------------|---------|--------------------------------------------------|
+| id               | integer | Unique batch ID                                  |
+| source_vm        | string  | Source VM identifier                             |
+| log_type         | string  | Log category                                     |
+| filename         | string  | Original filename of the log                     |
+| integrity_status | string  | `"VERIFIED"`, `"TAMPERED"`, or `"ERROR"`         |
+| ts               | string  | ISO 8601 timestamp of the log batch collection time |
+
+### Status Codes
+
+| Code | Meaning                                              |
+|------|------------------------------------------------------|
+| 200  | Batches returned successfully (results array may be empty) |
+| 401  | Missing or invalid `X-API-Key`                       |
+| 500  | Internal server error                                |
 
 ---
 
@@ -103,9 +174,12 @@ Retrieve a paginated list of AI-generated analysis reports, with optional filter
 
 | Parameter | Type    | Required | Default | Description                                |
 |-----------|---------|----------|---------|--------------------------------------------|
+| batch_id  | integer | No       | -       | Filter by batch ID. Use this to check whether a report has been generated for a specific ingestion (e.g. `GET /reports?batch_id=42`). |
 | source_vm | string  | No       | -       | Filter by source VM identifier             |
 | log_type  | string  | No       | -       | Filter by log type                         |
 | severity  | string  | No       | -       | Filter by severity (`"CRITICAL"`, `"HIGH"`, `"MEDIUM"`, `"LOW"`, `"CLEAN"`) |
+| from_ts   | string  | No       | -       | Return only reports with `ts` at or after this ISO 8601 timestamp |
+| to_ts     | string  | No       | -       | Return only reports with `ts` at or before this ISO 8601 timestamp |
 | page      | integer | No       | `1`     | Page number for pagination                 |
 | page_size | integer | No       | `20`    | Number of results per page (max `100`)     |
 
@@ -129,6 +203,7 @@ GET /reports?source_vm=vm-prod-01&severity=HIGH&page=1&page_size=10
       "summary": "Multiple failed SSH login attempts detected from a single IP.",
       "findings": "192.168.1.100 made 47 failed login attempts targeting root over 3 minutes.",
       "recommendations": "Block IP 192.168.1.100 via firewall. Enable fail2ban. Review SSH access policy.",
+      "integrity_status": "VERIFIED",
       "ts": "2026-04-04T12:00:00Z"
     }
   ],
@@ -157,6 +232,7 @@ GET /reports?source_vm=vm-prod-01&severity=HIGH&page=1&page_size=10
 | summary         | string  | Short AI-generated summary of the log analysis          |
 | findings        | string  | Detailed findings from the AI analysis                  |
 | recommendations | string  | AI-generated remediation recommendations                |
+| integrity_status| string  | Always `"VERIFIED"`. Reports are only generated for batches that pass integrity verification; `TAMPERED` batches skip AI analysis and produce no report. |
 | ts              | string  | ISO 8601 timestamp of the original log entry            |
 
 ### Status Codes
@@ -186,7 +262,11 @@ Ask a natural language question about ingested logs and receive an AI-generated 
 {
   "question": "string",
   "source_vm": "string (optional)",
-  "log_type": "string (optional)"
+  "log_type": "string (optional)",
+  "history": [
+    { "role": "user", "content": "string" },
+    { "role": "assistant", "content": "string" }
+  ]
 }
 ```
 
@@ -195,14 +275,28 @@ Ask a natural language question about ingested logs and receive an AI-generated 
 | question  | string | Yes      | Natural language question about the log data        |
 | source_vm | string | No       | Scope the query to a specific source VM             |
 | log_type  | string | No       | Scope the query to a specific log type              |
+| history   | array  | No       | Previous conversation turns for multi-turn context. Each item has `role` (`"user"` or `"assistant"`) and `content` (string). If omitted, the query is treated as a standalone question. |
 
-### Example Request
+### Example Request (standalone)
 
 ```json
 {
   "question": "Were there any brute force attempts in the last 24 hours?",
   "source_vm": "vm-prod-01",
   "log_type": "intrusion"
+}
+```
+
+### Example Request (multi-turn)
+
+```json
+{
+  "question": "Which IP was responsible?",
+  "source_vm": "vm-prod-01",
+  "history": [
+    { "role": "user", "content": "Were there any brute force attempts in the last 24 hours?" },
+    { "role": "assistant", "content": "Yes. vm-prod-01 recorded 47 failed SSH login attempts consistent with a brute force attack." }
+  ]
 }
 ```
 
@@ -240,11 +334,11 @@ Ask a natural language question about ingested logs and receive an AI-generated 
 
 | Code | Meaning                                           |
 |------|---------------------------------------------------|
-| 200  | Answer generated successfully                     |
+| 200  | Answer generated successfully. If no logs have been ingested yet, the response body will be `{"answer": "No logs have been ingested yet.", "citations": []}`. |
 | 400  | Missing or invalid `question` field               |
 | 401  | Missing or invalid `X-API-Key`                    |
 | 500  | Internal server error during AI query             |
-| 503  | Service dependency unavailable (ChromaDB unreachable or no logs ingested yet). Check the `error` field in the response body for the specific reason. |
+| 503  | Infrastructure dependency unavailable (e.g. ChromaDB unreachable). Check the `error` field in the response body for the specific reason. |
 
 ---
 
@@ -276,7 +370,9 @@ GET /integrity?source_vm=vm-prod-01
 {
   "vm-prod-01": {
     "status": "VERIFIED",
-    "tampered_batch_id": null
+    "tampered_batch_id": null,
+    "batch_count": 12,
+    "last_verified_ts": "2026-04-04T12:00:00Z"
   }
 }
 ```
@@ -293,11 +389,15 @@ GET /integrity
 {
   "vm-prod-01": {
     "status": "VERIFIED",
-    "tampered_batch_id": null
+    "tampered_batch_id": null,
+    "batch_count": 12,
+    "last_verified_ts": "2026-04-04T12:00:00Z"
   },
   "vm-staging-02": {
     "status": "TAMPERED",
-    "tampered_batch_id": 38
+    "tampered_batch_id": 38,
+    "batch_count": 5,
+    "last_verified_ts": "2026-04-03T09:15:00Z"
   }
 }
 ```
@@ -308,6 +408,8 @@ The response is a dictionary keyed by VM identifier. When `source_vm` is provide
 |-------------------|--------------|--------------------------------------------------------------------------------|
 | status            | string       | `"VERIFIED"` if the chain for this VM is intact, `"TAMPERED"` if not, `"ERROR"` if the integrity check could not complete. |
 | tampered_batch_id | integer\|null| The batch ID where tampering was first detected, or `null` if status is `"VERIFIED"` or `"ERROR"`. |
+| batch_count       | integer      | Total number of batches ingested for this VM.                                  |
+| last_verified_ts  | string\|null | ISO 8601 timestamp of the most recently verified batch for this VM, or `null` if no batches have been verified. |
 
 ### Status Codes
 
@@ -322,7 +424,7 @@ The response is a dictionary keyed by VM identifier. When `source_vm` is provide
 
 ## POST /upload
 
-Upload a log file directly. The backend will parse and ingest it automatically.
+Upload a log file directly (max 10 MB). The backend will parse and ingest it automatically.
 
 ### Headers
 
@@ -358,26 +460,25 @@ curl -X POST http://<host>:<port>/upload \
   "filename": "auth.log",
   "status": "ingested",
   "batch_id": 43,
-  "integrity_status": "VERIFIED",
-  "report_id": 18
+  "integrity_status": "VERIFIED"
 }
 ```
 
-| Field            | Type         | Description                              |
-|------------------|--------------|------------------------------------------|
-| filename         | string       | Name of the uploaded file                |
-| status           | string       | `"ingested"` on success                  |
-| batch_id         | integer      | ID of the created log batch              |
-| integrity_status | string       | `"VERIFIED"`, `"TAMPERED"`, or `"ERROR"` |
-| report_id        | integer\|null | ID of the generated report, or `null` if integrity failed or AI analysis failed |
+| Field            | Type    | Description                              |
+|------------------|---------|------------------------------------------|
+| filename         | string  | Name of the uploaded file                |
+| status           | string  | `"ingested"` on success                  |
+| batch_id         | integer | ID of the created log batch              |
+| integrity_status | string  | `"VERIFIED"`, `"TAMPERED"`, or `"ERROR"` |
 
 ### Status Codes
 
 | Code | Meaning                                           |
 |------|---------------------------------------------------|
-| 200  | File uploaded and ingested successfully           |
+| 200  | File uploaded and ingested successfully. AI analysis runs asynchronously - poll `GET /reports?batch_id=<batch_id>` to retrieve results. |
 | 400  | No file provided or unsupported file format       |
 | 401  | Missing or invalid `X-API-Key`                    |
+| 413  | File exceeds maximum allowed size of 10 MB        |
 | 500  | Internal server error during file processing      |
 
 ---
@@ -433,5 +534,6 @@ All error responses follow a consistent shape:
 |---------|------------|---------|
 | v1      | 2026-04-04 | Initial contract |
 | v2      | 2026-04-05 | Added pagination metadata to `/reports`. Expanded `/upload` response with `batch_id`, `integrity_status`, `report_id`. Added `source_vm` and `log_type` form fields to `/upload`. Clarified `/integrity` filter behavior with separate examples and empty-VM case. Clarified `"ERROR"` state semantics on `/ingest`. Clarified 503 on `/query` covers both empty DB and unreachable ChromaDB. Added `citations` array to `/query` response. Changed `/ingest` description from "log entry" to "log batch". Defined `log_type` as a controlled set with 400 on invalid values. Added `ts` trust note on `/ingest`. |
+| v3      | 2026-04-07 | Removed `report_id` from `/ingest` and `/upload` responses - AI analysis now runs asynchronously. Added `GET /batches` endpoint for chronological batch listing. Added `history` array to `POST /query` for multi-turn conversation support. Added `batch_count` and `last_verified_ts` to `GET /integrity` VM objects. Changed `/ingest` `ts` description to "log batch collection time". Added `from_ts`/`to_ts` date-range filters to `GET /reports`. Added `integrity_status` field to report objects in `GET /reports`. Changed `POST /query` to return 200 with informational message when DB is empty, reserved 503 for infrastructure failures. Added 10 MB file size limit and 413 status code to `POST /upload`. |
 
-*Last updated: 2026-04-05*
+*Last updated: 2026-04-07*

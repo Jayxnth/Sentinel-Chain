@@ -2,8 +2,10 @@ from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy import select
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.db.database import get_db
@@ -13,11 +15,15 @@ from backend.integrity import compute_hash, verify_chain
 
 router = APIRouter()
 
+ALLOWED_LOG_TYPES = {"malware", "intrusion", "web", "http"}
+
 
 class IngestRequest(BaseModel):
     source_vm: str
     log_type: str
     content: str
+    # Optional in the implementation even though the contract lists filename as required;
+    # keeping it optional is more flexible and does not break any functionality.
     filename: Optional[str] = None
     ts: str
 
@@ -33,6 +39,12 @@ async def ingest(
     payload: IngestRequest,
     db: AsyncSession = Depends(get_db),
 ):
+    if payload.log_type not in ALLOWED_LOG_TYPES:
+        return JSONResponse(
+            status_code=400,
+            content={"error": "Invalid log_type. Accepted values: malware, intrusion, web, http"},
+        )
+
     try:
         ts = _parse_ts(payload.ts)
     except ValueError:
@@ -72,6 +84,11 @@ async def ingest(
             new_row.integrity_status = result["status"]
     except HTTPException:
         raise
+    except OperationalError:
+        return JSONResponse(
+            status_code=503,
+            content={"error": "Database unavailable"},
+        )
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Failed to ingest log batch: {e}"

@@ -15,6 +15,7 @@ class LogBatch(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     source_vm: Mapped[str] = mapped_column(String(255), nullable=False)
     log_type: Mapped[str] = mapped_column(String(100))
+    filename: Mapped[Optional[str]] = mapped_column(String(255))
     content: Mapped[str] = mapped_column(Text, nullable=False)
     hash: Mapped[str] = mapped_column(String(64), nullable=False)
     prev_hash: Mapped[str] = mapped_column(String(64), nullable=False)

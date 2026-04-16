@@ -1,0 +1,15 @@
+[Unit]
+Description=Sentinel-Chain Agent
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/sentinel-agent
+ExecStart=/usr/bin/python3 agent.py
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

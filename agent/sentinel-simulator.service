@@ -1,0 +1,15 @@
+[Unit]
+Description=Sentinel-Chain Log Simulator
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/sentinel-agent
+ExecStart=/usr/bin/python3 simulator.py --output-dir /var/log/sentinel-sim
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

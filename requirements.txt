@@ -10,3 +10,4 @@ asyncpg
 fastapi
 uvicorn[standard]
 aiosqlite
+python-multipart

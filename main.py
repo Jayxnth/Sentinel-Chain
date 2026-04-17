@@ -1,6 +1,7 @@
 import os
 from dotenv import load_dotenv
 import ingest
+import analyze
 import chat
 
 def run_pipeline():
@@ -26,8 +27,12 @@ def run_pipeline():
         print("[!] Pipeline halted. Ensure logs are present in the 'logs/' folder and API key is set.")
         return
         
-    # Step 2: Interactive chat loop
-    print("\n[2] Interactive Chat Phase")
+    # Step 2: Automated Threat Analysis
+    print("\n[2] Automated Threat Analysis Phase")
+    analyze.analyze_logs()
+        
+    # Step 3: Interactive chat loop
+    print("\n[3] Interactive Chat Phase")
     chat.start_chat()
 
 if __name__ == "__main__":

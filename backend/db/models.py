@@ -30,7 +30,7 @@ class LogBatch(Base):
 class ThreatReport(Base):
     __tablename__ = "reports"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    batch_id: Mapped[int] = mapped_column(Integer, ForeignKey("log_batches.id"), nullable=False)
+    batch_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("log_batches.id"), nullable=True)
     source_vm: Mapped[Optional[str]] = mapped_column(String(255))
     log_type: Mapped[Optional[str]] = mapped_column(String(100))
     severity: Mapped[Optional[str]] = mapped_column(String(10))

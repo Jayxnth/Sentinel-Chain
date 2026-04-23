@@ -13,13 +13,13 @@ DB_DIR = os.path.join(BASE_DIR, "chroma_db")
 def extract_filters(query):
     query_lower = query.lower()
     filters = {}
-    
+
     # Check for VM restrictions
     if "vm1" in query_lower:
         filters["source_vm"] = "vm1"
     elif "vm2" in query_lower:
         filters["source_vm"] = "vm2"
-        
+
     # Check for Log Type restrictions
     if "malware" in query_lower:
         filters["log_type"] = "malware"
@@ -29,61 +29,61 @@ def extract_filters(query):
         filters["log_type"] = "web"
     elif "http" in query_lower:
         filters["log_type"] = "http"
-        
+
     return filters if filters else None
 
 def start_chat():
     print("\n[*] Initializing NLP Chat Interface...")
-    
+
     if not os.path.exists(DB_DIR):
         print("[!] ChromaDB directory not found. Please run ingest first.")
         return
-        
+
     # Same local offline embeddings used in ingestion (force offline mode to bypass ConnectionReset)
     embeddings = HuggingFaceEmbeddings(
-        model_name="all-MiniLM-L6-v2", 
+        model_name="all-MiniLM-L6-v2",
         model_kwargs={'local_files_only': True}
     )
     vectorstore = Chroma(persist_directory=DB_DIR, embedding_function=embeddings)
-    
+
     # Initialize the Gemini generative AI
     llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.3)
-    
+
     # Use native message array (bypassing deprecated ConversationBufferMemory)
     memory_history = []
-    
+
     print("\n" + "="*60)
     print("Welcome to Sentinel-Chain AI Core Chat")
     print("Type your questions about the logs in plain English.")
     print("Type 'exit' or 'quit' to close the interface.")
     print("="*60 + "\n")
-    
+
     while True:
         try:
             user_input = input("Sentinel-Chain> ")
             if user_input.strip().lower() in ['exit', 'quit']:
                 print("Exiting chat loop. Stay safe!")
                 break
-                
+
             if not user_input.strip():
                 continue
-                
+
             # Filter the DB based on the query text (VMs / Log types)
             metadata_filters = extract_filters(user_input)
-            
+
             if metadata_filters:
                 search_kwargs = {"k": 10, "filter": metadata_filters}
                 print(f"[*] Applying search filters: {metadata_filters}")
             else:
                 search_kwargs = {"k": 10}
-                
-            retriever = vectorstore.as_retriever(search_kwargs=search_kwargs) 
+
+            retriever = vectorstore.as_retriever(search_kwargs=search_kwargs)
             docs = retriever.invoke(user_input)
-            
+
             if not docs:
                 print("\nAI: I couldn't find any relevant logs for that query.\n")
                 continue
-            
+
             # Format context with citations (Issue 12)
             context_pieces = []
             for idx, doc in enumerate(docs):
@@ -91,10 +91,10 @@ def start_chat():
                 lt = doc.metadata.get('log_type', 'unknown')
                 ts = doc.metadata.get('timestamp', 'unknown')
                 context_pieces.append(f"[Source {idx+1} | File: {fn} | Type: {lt} | Time: {ts}]\n{doc.page_content}")
-            
+
             context = "\n\n".join(context_pieces)
-            
-            # Unpack memory into string 
+
+            # Unpack memory into string
             history_str = ""
             start_idx = max(0, len(memory_history) - 6)
             for i in range(start_idx, len(memory_history)):
@@ -103,7 +103,7 @@ def start_chat():
                     history_str += f"User: {msg.content}\n"
                 elif isinstance(msg, AIMessage):
                     history_str += f"Assistant: {msg.content}\n"
-            
+
             # Construct Generative Prompt enforcing citations
             full_prompt = (
                 "You are Sentinel-Chain AI Core, an expert cybersecurity assistant.\n"
@@ -114,21 +114,21 @@ def start_chat():
                 "Be concise, analytical, and reference specific log details when possible.\n\n"
                 f"Context Logs:\n{context}\n\n"
             )
-            
+
             if history_str:
                 full_prompt += f"Recent Chat History:\n{history_str}\n\n"
-                
+
             full_prompt += f"User Query: {user_input}"
-            
+
             # Send exactly ONE API request directly to the Gemini LLM
             response = llm.invoke(full_prompt)
             answer = response.content
             print(f"\nAI: {answer}\n")
-            
+
             # Save interactions to custom memory
             memory_history.append(HumanMessage(content=user_input))
             memory_history.append(AIMessage(content=answer))
-            
+
         except KeyboardInterrupt:
             print("\nExiting chat loop. Stay safe!")
             break

@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.db.database import get_db
 from backend.dependencies import verify_api_key
+from backend import config
 
 REPO_ROOT = str(Path(__file__).resolve().parents[2])
 
@@ -92,7 +93,7 @@ def _run_query(question: str, metadata_filter: dict | None, history_str: str) ->
         prompt += f"Recent Chat History:\n{history_str}\n\n"
     prompt += f"User Query: {question}"
 
-    llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.3)
+    llm = ChatGoogleGenerativeAI(model=config.GEMINI_MODEL, temperature=0.3)
     response = llm.invoke(prompt)
     return response.content, citations
 

@@ -85,14 +85,13 @@ async def upload(
         return {
             "filename": file.filename,
             "status": "ingested",
+            "batch_id": None,
             "integrity_status": "VERIFIED",
-            "report_id": report.id,
         }
 
     return {
         "filename": file.filename,
         "status": "ingested",
+        "batch_id": None,
         "integrity_status": "VERIFIED",
-        "report_id": None,
-        "warning": "AI analysis failed or timed out",
     }

@@ -104,7 +104,7 @@ async def query(
 ):
     db_dir = os.path.join(REPO_ROOT, "chroma_db")
     if not os.path.exists(db_dir):
-        return JSONResponse(status_code=503, content={"error": "No logs have been ingested yet"})
+        return {"answer": "No logs have been ingested yet.", "citations": []}
 
     # Build explicit filter from request params
     metadata_filter = None

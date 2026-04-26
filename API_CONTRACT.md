@@ -21,7 +21,7 @@ This document defines all backend endpoints for the Sentinel-Chain project. It i
 
 ## POST /ingest
 
-Ingest a log batch from a VM, verify chain integrity, and store the result on-chain. AI analysis runs asynchronously in the background; the agent should poll `GET /reports?batch_id=<batch_id>` to check whether a report has been generated.
+Ingest a log batch from a VM, verify chain integrity, and store the result on-chain. AI analysis runs synchronously as part of the ingest request. The response includes the generated `report_id` on success. Typical latency is 5–30 seconds depending on batch size and Gemini API load. The client should set a request timeout of at least 90 seconds.
 
 ### Headers
 
@@ -67,14 +67,17 @@ Ingest a log batch from a VM, verify chain integrity, and store the result on-ch
 ```json
 {
   "batch_id": 42,
-  "integrity_status": "VERIFIED"
+  "integrity_status": "VERIFIED",
+  "report_id": 17
 }
 ```
 
-| Field            | Type    | Description                                                |
-|------------------|---------|------------------------------------------------------------|
-| batch_id         | integer | Unique ID of the ingested log batch stored on-chain        |
-| integrity_status | string  | `"VERIFIED"` if the chain is intact, `"TAMPERED"` if not, `"ERROR"` if the integrity check itself failed (e.g. database read error). On `"ERROR"`, the batch is still stored but not analyzed. |
+| Field            | Type             | Description                                                |
+|------------------|------------------|------------------------------------------------------------|
+| batch_id         | integer          | Unique ID of the ingested log batch stored on-chain        |
+| integrity_status | string           | `"VERIFIED"` if the chain is intact, `"TAMPERED"` if not, `"ERROR"` if the integrity check itself failed (e.g. database read error). On `"ERROR"`, the batch is still stored but not analyzed. |
+| report_id        | integer \| null  | ID of the generated threat report. `null` if AI analysis failed or timed out. The field is always present in responses where `integrity_status` is `VERIFIED`. |
+| warning          | string, optional | Present only if AI analysis failed or timed out. Human-readable explanation. |
 
 ### Status Codes
 
@@ -464,12 +467,13 @@ curl -X POST http://<host>:<port>/upload \
 }
 ```
 
-| Field            | Type    | Description                              |
-|------------------|---------|------------------------------------------|
-| filename         | string  | Name of the uploaded file                |
-| status           | string  | `"ingested"` on success                  |
-| batch_id         | integer | ID of the created log batch              |
-| integrity_status | string  | `"VERIFIED"`, `"TAMPERED"`, or `"ERROR"` |
+| Field            | Type             | Description                              |
+|------------------|------------------|------------------------------------------|
+| filename         | string           | Name of the uploaded file                |
+| status           | string           | `"ingested"` on success                  |
+| batch_id         | integer \| null  | ID of the created log batch. Currently always `null` — uploads do not yet create a LogBatch row. Tracked for a follow-up fix. |
+| integrity_status | string           | `"VERIFIED"`, `"TAMPERED"`, or `"ERROR"` |
+| report_id        | integer \| null  | ID of the generated threat report. `null` if AI analysis failed or timed out. |
 
 ### Status Codes
 
@@ -535,5 +539,6 @@ All error responses follow a consistent shape:
 | v1      | 2026-04-04 | Initial contract |
 | v2      | 2026-04-05 | Added pagination metadata to `/reports`. Expanded `/upload` response with `batch_id`, `integrity_status`, `report_id`. Added `source_vm` and `log_type` form fields to `/upload`. Clarified `/integrity` filter behavior with separate examples and empty-VM case. Clarified `"ERROR"` state semantics on `/ingest`. Clarified 503 on `/query` covers both empty DB and unreachable ChromaDB. Added `citations` array to `/query` response. Changed `/ingest` description from "log entry" to "log batch". Defined `log_type` as a controlled set with 400 on invalid values. Added `ts` trust note on `/ingest`. |
 | v3      | 2026-04-07 | Removed `report_id` from `/ingest` and `/upload` responses - AI analysis now runs asynchronously. Added `GET /batches` endpoint for chronological batch listing. Added `history` array to `POST /query` for multi-turn conversation support. Added `batch_count` and `last_verified_ts` to `GET /integrity` VM objects. Changed `/ingest` `ts` description to "log batch collection time". Added `from_ts`/`to_ts` date-range filters to `GET /reports`. Added `integrity_status` field to report objects in `GET /reports`. Changed `POST /query` to return 200 with informational message when DB is empty, reserved 503 for infrastructure failures. Added 10 MB file size limit and 413 status code to `POST /upload`. |
+| v4      | 2026-04-24 | Aligned contract with current implementation. `/ingest` and `/upload` responses now document `report_id` (integer \| null) and `warning` (string, optional). Clarified that `/ingest` AI analysis runs synchronously with typical 5–30s latency. Documented current `/upload` `batch_id: null` limitation pending follow-up fix. |
 
-*Last updated: 2026-04-07*
+*Last updated: 2026-04-24*

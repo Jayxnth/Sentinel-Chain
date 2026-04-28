@@ -32,9 +32,10 @@ source_cols = st.columns(max(1, min(3, len(set(batch_counts) | set(integrity))))
 for index, vm in enumerate(sorted(set(batch_counts) | set(integrity))):
     data = integrity.get(vm, {})
     body = f"""
-    <div class="sc-muted">Last seen: {safe_ts(last_seen.get(vm))}</div>
-    <div class="sc-muted">Batch count: {batch_counts.get(vm, data.get('checked_batches', 0))}</div>
+    <div class="sc-muted">Last seen: {safe_ts(last_seen.get(vm) or data.get('last_verified_ts'))}</div>
+    <div class="sc-muted">Batch count: {data.get('batch_count', batch_counts.get(vm, 0))}</div>
     <div class="sc-muted">Tampered batch: {data.get('tampered_batch_id') or 'none'}</div>
+    <div class="sc-muted">Last verified: {safe_ts(data.get('last_verified_ts'))}</div>
     """
     with source_cols[index % len(source_cols)]:
         card(vm, body, badge(data.get("status", "UNKNOWN"), data.get("status", "UNKNOWN")))

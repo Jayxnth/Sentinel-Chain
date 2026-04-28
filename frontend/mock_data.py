@@ -124,19 +124,15 @@ REPORTS = [
 INTEGRITY = {
     "vm1-linux": {
         "status": "VERIFIED",
-        "checked_batches": 42,
         "tampered_batch_id": None,
-        "last_hash": "64abf773c6c26a2ce31f2f9c0c6a0e89f1792c2e8f9a9c97d2a1ce9351e30a44",
-        "expected_hash": None,
-        "actual_hash": None,
+        "batch_count": 42,
+        "last_verified_ts": (NOW - timedelta(minutes=4)).isoformat(),
     },
     "vm2-windows": {
         "status": "TAMPERED",
-        "checked_batches": 36,
         "tampered_batch_id": 109,
-        "last_hash": "7d80287d42cbfe9c99bb1e8df7351b1d8356f8e28cd62eb89ea0fe31efb63d0b",
-        "expected_hash": "a3474f548fe06c83d5fa52f1254fd6f43f3434e4f1a9cb6b4936a70153f92b12",
-        "actual_hash": "d3a1f62a7f523f94899d2f70e11bcecadb3407e38cf8c0a83d91c76e50d1a670",
+        "batch_count": 36,
+        "last_verified_ts": (NOW - timedelta(minutes=9)).isoformat(),
     },
 }
 

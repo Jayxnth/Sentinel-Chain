@@ -68,8 +68,9 @@ with right:
         card(
             vm,
             f"""
-            <div class="sc-muted">Checked batches: {data.get('checked_batches', 'unknown')}</div>
+            <div class="sc-muted">Batch count: {data.get('batch_count', 'unknown')}</div>
             <div class="sc-muted">Tampered batch: {data.get('tampered_batch_id') or 'none'}</div>
+            <div class="sc-muted">Last verified: {safe_ts(data.get('last_verified_ts'))}</div>
             """,
             badge(data.get("status"), data.get("status")),
         )

@@ -4,7 +4,7 @@ import streamlit as st
 
 from frontend.data import load_dashboard_data, sidebar_config, vm_options
 from frontend.exports import integrity_csv, integrity_pdf
-from frontend.style import apply_theme, badge, card, configure_page, global_alert, page_header
+from frontend.style import apply_theme, badge, card, configure_page, global_alert, page_header, safe_ts
 
 
 configure_page("Integrity")
@@ -35,8 +35,9 @@ export_cols[1].download_button("PDF", data=integrity_pdf(integrity), file_name="
 cols = st.columns(max(1, min(3, len(integrity))))
 for index, (vm, data) in enumerate(integrity.items()):
     body = f"""
-    <div class="sc-muted">Checked batches: {data.get('checked_batches', 'unknown')}</div>
+    <div class="sc-muted">Batch count: {data.get('batch_count', 'unknown')}</div>
     <div class="sc-muted">Tampered batch: {data.get('tampered_batch_id') or 'none'}</div>
+    <div class="sc-muted">Last verified: {safe_ts(data.get('last_verified_ts'))}</div>
     """
     with cols[index % len(cols)]:
         card(vm, body, badge(data.get("status", "UNKNOWN"), data.get("status", "UNKNOWN")))
@@ -44,14 +45,23 @@ for index, (vm, data) in enumerate(integrity.items()):
             st.code(
                 "\n".join(
                     [
+                        f"status: {data.get('status', 'UNKNOWN')}",
+                        f"batch_count: {data.get('batch_count', 'unknown')}",
                         f"tampered_batch_id: {data.get('tampered_batch_id')}",
-                        f"expected_hash: {data.get('expected_hash')}",
-                        f"actual_hash:   {data.get('actual_hash')}",
+                        f"last_verified_ts: {data.get('last_verified_ts') or 'unknown'}",
                     ]
                 )
             )
         else:
-            st.code(f"last_hash: {data.get('last_hash', 'not provided')}")
+            st.code(
+                "\n".join(
+                    [
+                        f"status: {data.get('status', 'UNKNOWN')}",
+                        f"batch_count: {data.get('batch_count', 'unknown')}",
+                        f"last_verified_ts: {data.get('last_verified_ts') or 'unknown'}",
+                    ]
+                )
+            )
 
 if not integrity:
     st.info("No integrity data available.")

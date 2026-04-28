@@ -90,10 +90,9 @@ def integrity_pdf(integrity: dict[str, Any]) -> bytes:
         pdf.set_font("Helvetica", "B", 11)
         pdf.write_wrapped(f"{vm}: {data.get('status', 'UNKNOWN')}", 7)
         pdf.set_font("Helvetica", "", 10)
-        for key in ("checked_batches", "tampered_batch_id", "last_hash", "expected_hash", "actual_hash"):
-            value = data.get(key)
-            if value is not None:
-                pdf.write_wrapped(f"{key}: {value}")
+        pdf.write_wrapped(f"batch_count: {data.get('batch_count', 'unknown')}")
+        pdf.write_wrapped(f"tampered_batch_id: {data.get('tampered_batch_id') or 'none'}")
+        pdf.write_wrapped(f"last_verified_ts: {safe_ts(data.get('last_verified_ts'))}")
     output = pdf.output(dest="S")
     if isinstance(output, str):
         return output.encode("latin-1")

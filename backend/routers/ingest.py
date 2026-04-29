@@ -121,6 +121,29 @@ async def ingest(
 
     await asyncio.to_thread(root_ingest.ingest_logs, file_path=log_path)
 
+    # Inject batch_id into ChromaDB metadata for the just-embedded chunks
+    try:
+        from langchain_community.vectorstores import Chroma
+        from langchain_huggingface import HuggingFaceEmbeddings
+
+        db_dir = os.path.join(REPO_ROOT, "chroma_db")
+        embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+        vectorstore = Chroma(persist_directory=db_dir, embedding_function=embeddings)
+        collection = vectorstore._collection
+
+        target_filename = os.path.basename(log_path)
+
+        result_meta = collection.get(where={"filename": target_filename})
+        if result_meta and result_meta.get("ids"):
+            new_metadatas = []
+            for old_md in result_meta.get("metadatas", []):
+                updated = dict(old_md) if old_md else {}
+                updated["batch_id"] = new_row.id
+                new_metadatas.append(updated)
+            collection.update(ids=result_meta["ids"], metadatas=new_metadatas)
+    except Exception as e:
+        print(f"[!] Warning: failed to inject batch_id into ChromaDB metadata: {e}")
+
     # Step 3: Run AI analysis with 60s timeout
     import analyze as root_analyze
 

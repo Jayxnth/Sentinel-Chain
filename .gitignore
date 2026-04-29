@@ -1,18 +1,47 @@
-```
-.env
-.venv/
-venv/
-env/
+# Python
 __pycache__/
 *.pyc
 *.pyo
-chroma_db/
-*.db
-*.sqlite
-.DS_Store
-Thumbs.db
 *.egg-info/
 dist/
 build/
+
+# Virtual envs
+.venv/
+venv/
+venv_dev/
+env/
+
+# Environment files
+.env
+
+# Databases and vector stores
+chroma_db/
+*.db
+*.sqlite
+.ingest_state.json
+
+# Runtime artifacts
+logs/
+sample_logs/
+
+# IDE / tooling
+.idea/
+.claude/
+.vscode/
+
+# OS noise
+.DS_Store
+Thumbs.db
+
+# Streamlit secrets
 /.streamlit/secrets.toml
-```logs/
+
+# Local test scratch files
+agent_batch*.json
+agent_query*.json
+ingest_payload.json
+query_payload.json
+test_upload.log
+verify_upload.log
+big_upload.log

@@ -72,7 +72,7 @@ def _run_query(question: str, metadata_filter: dict | None, history_str: str) ->
         ts = doc.metadata.get("timestamp", "unknown")
         context_pieces.append(f"[Source {idx+1} | File: {fn} | Type: {lt} | Time: {ts}]\n{doc.page_content}")
         citations.append({
-            "batch_id": None,
+            "batch_id": doc.metadata.get("batch_id"),
             "source_vm": doc.metadata.get("source_vm"),
             "log_line": doc.page_content[:200],
             "ts": ts,

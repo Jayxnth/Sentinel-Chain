@@ -10,6 +10,8 @@ from langchain_core.prompts import PromptTemplate
 
 load_dotenv()
 
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_DIR = os.path.join(BASE_DIR, "chroma_db")
 
@@ -52,7 +54,7 @@ def analyze_logs():
         return None
 
     # Initialize Gemini 1.5 Flash
-    llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0.2)
+    llm = ChatGoogleGenerativeAI(model=GEMINI_MODEL, temperature=0.2)
 
     prompt_template = """
 You are a security analyst, "Sentinel-Chain AI Core".

@@ -59,8 +59,6 @@ jobs:
     needs: tests
     runs-on: ubuntu-latest
     env:
-      VM_HOST: ${{ secrets.VM3_HOST }}
-      VM_SSH_USER: ${{ secrets.VM3_SSH_USER }}
       VM_SSH_PORT: ${{ secrets.VM3_SSH_PORT || '22' }}
       VM_SSH_PRIVATE_KEY: ${{ secrets.VM3_SSH_PRIVATE_KEY }}
       VM_SSH_KNOWN_HOSTS: ${{ secrets.VM3_SSH_KNOWN_HOSTS }}
@@ -76,6 +74,21 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Initialize deploy variables
+        run: |
+          VM_HOST="${{ secrets.VM3_HOST }}"
+          VM_SSH_USER="${{ secrets.VM3_SSH_USER }}"
+
+          if [ -z "$VM_HOST" ] || [ -z "$VM_SSH_USER" ]; then
+            echo "VM3_HOST and VM3_SSH_USER secrets must be configured." >&2
+            exit 1
+          fi
+
+          {
+            echo "VM_HOST=$VM_HOST"
+            echo "VM_SSH_USER=$VM_SSH_USER"
+          } >> "$GITHUB_ENV"
+
       - name: Prepare SSH
         run: |
           install -m 700 -d ~/.ssh
@@ -86,12 +99,20 @@ jobs:
 
       - name: Package repository for deployment
         run: |
+          set +e
           tar --exclude-vcs \
               --exclude='.venv' \
               --exclude='__pycache__' \
               --exclude='.pytest_cache' \
               --exclude='chroma_db' \
+              --exclude='sentinel-chain.tar.gz' \
               -czf sentinel-chain.tar.gz .
+          tar_exit=$?
+          set -e
+
+          if [ "$tar_exit" -gt 1 ]; then
+            exit "$tar_exit"
+          fi
 
       - name: Upload package to VM3
         run: |

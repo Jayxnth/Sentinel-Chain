@@ -1,0 +1,130 @@
+name: Backend VM3 CI/CD
+
+on:
+  push:
+    branches:
+      - feat/fastapi-scaffold
+  pull_request:
+    branches:
+      - feat/fastapi-scaffold
+  workflow_dispatch:
+    inputs:
+      app_dir:
+        description: "Deployment directory on VM3"
+        required: false
+        default: "/opt/sentinel-chain"
+      venv_path:
+        description: "Virtualenv path on VM3"
+        required: false
+        default: "/opt/sentinel-chain/.venv"
+      app_host:
+        description: "Uvicorn bind host"
+        required: false
+        default: "0.0.0.0"
+      app_port:
+        description: "Uvicorn bind port"
+        required: false
+        default: "8000"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-vm3-cicd-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    if: github.ref_name == 'feat/fastapi-scaffold'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run backend tests
+        run: pytest -q backend/tests
+
+  deploy:
+    if: github.ref_name == 'feat/fastapi-scaffold' && github.event_name != 'pull_request'
+    needs: tests
+    runs-on: ubuntu-latest
+    env:
+      VM_HOST: ${{ secrets.VM3_HOST }}
+      VM_SSH_USER: ${{ secrets.VM3_SSH_USER }}
+      VM_SSH_PORT: ${{ secrets.VM3_SSH_PORT || '22' }}
+      VM_SSH_PRIVATE_KEY: ${{ secrets.VM3_SSH_PRIVATE_KEY }}
+      VM_SSH_KNOWN_HOSTS: ${{ secrets.VM3_SSH_KNOWN_HOSTS }}
+      DATABASE_URL: ${{ secrets.VM3_DATABASE_URL }}
+      API_KEY: ${{ secrets.VM3_API_KEY }}
+      GOOGLE_API_KEY: ${{ secrets.VM3_GOOGLE_API_KEY }}
+      GEMINI_MODEL: ${{ secrets.VM3_GEMINI_MODEL || 'gemini-2.5-flash' }}
+      APP_DIR: ${{ github.event.inputs.app_dir || '/opt/sentinel-chain' }}
+      VENV_PATH: ${{ github.event.inputs.venv_path || '/opt/sentinel-chain/.venv' }}
+      APP_HOST: ${{ github.event.inputs.app_host || '0.0.0.0' }}
+      APP_PORT: ${{ github.event.inputs.app_port || '8000' }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Prepare SSH
+        run: |
+          install -m 700 -d ~/.ssh
+          install -m 600 /dev/null ~/.ssh/id_vm3
+          printf '%s\n' "$VM_SSH_PRIVATE_KEY" > ~/.ssh/id_vm3
+          install -m 600 /dev/null ~/.ssh/known_hosts
+          printf '%s\n' "$VM_SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Package repository for deployment
+        run: |
+          tar --exclude-vcs \
+              --exclude='.venv' \
+              --exclude='__pycache__' \
+              --exclude='.pytest_cache' \
+              --exclude='chroma_db' \
+              -czf sentinel-chain.tar.gz .
+
+      - name: Upload package to VM3
+        run: |
+          scp -P "$VM_SSH_PORT" -i ~/.ssh/id_vm3 sentinel-chain.tar.gz "$VM_SSH_USER@$VM_HOST:/tmp/sentinel-chain.tar.gz"
+
+      - name: Deploy on VM3
+        run: |
+          DB_B64="$(printf '%s' "$DATABASE_URL" | base64 -w 0)"
+          API_KEY_B64="$(printf '%s' "$API_KEY" | base64 -w 0)"
+          GOOGLE_API_KEY_B64="$(printf '%s' "$GOOGLE_API_KEY" | base64 -w 0)"
+          GEMINI_MODEL_B64="$(printf '%s' "$GEMINI_MODEL" | base64 -w 0)"
+
+          ssh -p "$VM_SSH_PORT" -i ~/.ssh/id_vm3 "$VM_SSH_USER@$VM_HOST" \
+            "sudo APP_DIR='$APP_DIR' VENV_PATH='$VENV_PATH' APP_HOST='$APP_HOST' APP_PORT='$APP_PORT' DB_B64='$DB_B64' API_KEY_B64='$API_KEY_B64' GOOGLE_API_KEY_B64='$GOOGLE_API_KEY_B64' GEMINI_MODEL_B64='$GEMINI_MODEL_B64' /bin/bash -s" <<'EOF'
+          set -euo pipefail
+
+          DATABASE_URL="$(printf '%s' "$DB_B64" | base64 -d)"
+          API_KEY="$(printf '%s' "$API_KEY_B64" | base64 -d)"
+          GOOGLE_API_KEY="$(printf '%s' "$GOOGLE_API_KEY_B64" | base64 -d)"
+          GEMINI_MODEL="$(printf '%s' "$GEMINI_MODEL_B64" | base64 -d)"
+
+          mkdir -p "$APP_DIR"
+          tar -xzf /tmp/sentinel-chain.tar.gz -C "$APP_DIR" --strip-components=1
+          rm -f /tmp/sentinel-chain.tar.gz
+          chmod +x "$APP_DIR/fast-api-deploy/deploy.sh"
+
+          "$APP_DIR/fast-api-deploy/deploy.sh" \
+            --app-dir "$APP_DIR" \
+            --venv-path "$VENV_PATH" \
+            --database-url "$DATABASE_URL" \
+            --api-key "$API_KEY" \
+            --google-api-key "$GOOGLE_API_KEY" \
+            --gemini-model "$GEMINI_MODEL" \
+            --host "$APP_HOST" \
+            --port "$APP_PORT"
+          EOF

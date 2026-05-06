@@ -1,0 +1,24 @@
+[Unit]
+Description=Sentinel-Chain FastAPI Backend
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__SERVICE_USER__
+Group=__SERVICE_USER__
+WorkingDirectory=__APP_DIR__
+EnvironmentFile=__ENV_FILE__
+ExecStart=__VENV_PATH__/bin/uvicorn backend.main:app --host __APP_HOST__ --port __APP_PORT__
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=__APP_DIR__
+UMask=0077
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

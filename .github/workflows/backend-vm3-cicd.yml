@@ -52,7 +52,7 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run backend tests
-        run: pytest -q backend/tests
+        run: python -m pytest -q
 
   deploy:
     if: github.ref_name == 'feat/fastapi-scaffold' && github.event_name != 'pull_request'
@@ -128,3 +128,8 @@ jobs:
             --host "$APP_HOST" \
             --port "$APP_PORT"
           EOF
+
+      - name: Smoke test backend on VM3
+        run: |
+          ssh -p "$VM_SSH_PORT" -i ~/.ssh/id_vm3 "$VM_SSH_USER@$VM_HOST" \
+            "set -euo pipefail; response=\$(curl --fail --silent --show-error --retry 10 --retry-delay 3 --max-time 10 'http://127.0.0.1:$APP_PORT/health'); echo \"\$response\"; echo \"\$response\" | grep -Eq '\"status\"[[:space:]]*:[[:space:]]*\"ok\"'"

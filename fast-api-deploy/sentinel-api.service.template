@@ -6,7 +6,7 @@ Wants=network-online.target
 [Service]
 Type=simple
 User=__SERVICE_USER__
-Group=__SERVICE_USER__
+Group=__SERVICE_GROUP__
 WorkingDirectory=__APP_DIR__
 EnvironmentFile=__ENV_FILE__
 ExecStart=__VENV_PATH__/bin/uvicorn backend.main:app --host __APP_HOST__ --port __APP_PORT__

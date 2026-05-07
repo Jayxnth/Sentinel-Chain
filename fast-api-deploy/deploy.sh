@@ -36,6 +36,7 @@ GOOGLE_API_KEY=""
 GEMINI_MODEL="gemini-2.5-flash"
 SERVICE_NAME="sentinel-api"
 SERVICE_USER="sentinel"
+SERVICE_GROUP=""
 ENV_FILE="/etc/sentinel-chain/sentinel-api.env"
 APP_HOST="0.0.0.0"
 APP_PORT="8000"
@@ -122,11 +123,13 @@ if [[ ! -f "$APP_DIR/fast-api-deploy/sentinel-api.service.template" ]]; then
 fi
 
 if ! id -u "$SERVICE_USER" >/dev/null 2>&1; then
-  useradd --system --create-home --shell /usr/sbin/nologin "$SERVICE_USER"
+  useradd --system --user-group --create-home --shell /usr/sbin/nologin "$SERVICE_USER"
 fi
 
+SERVICE_GROUP="$(id -gn "$SERVICE_USER")"
+
 mkdir -p "$APP_DIR"
-chown -R "$SERVICE_USER:$SERVICE_USER" "$APP_DIR"
+chown -R "$SERVICE_USER:$SERVICE_GROUP" "$APP_DIR"
 
 python3 -m venv "$VENV_PATH"
 "$VENV_PATH/bin/pip" install --upgrade pip
@@ -135,7 +138,7 @@ python3 -m venv "$VENV_PATH"
 env_dir="$(dirname "$ENV_FILE")"
 install -d -m 750 "$env_dir"
 install -m 600 /dev/null "$ENV_FILE"
-chown root:"$SERVICE_USER" "$ENV_FILE"
+chown root:"$SERVICE_GROUP" "$ENV_FILE"
 chmod 640 "$ENV_FILE"
 
 sq() {
@@ -150,7 +153,7 @@ sq() {
   printf "PYTHONUNBUFFERED='1'\n"
 } >"$ENV_FILE"
 
-chown root:"$SERVICE_USER" "$ENV_FILE"
+chown root:"$SERVICE_GROUP" "$ENV_FILE"
 chmod 640 "$ENV_FILE"
 
 cd "$APP_DIR"
@@ -166,6 +169,7 @@ esc() {
 app_dir_esc="$(esc "$APP_DIR")"
 venv_path_esc="$(esc "$VENV_PATH")"
 service_user_esc="$(esc "$SERVICE_USER")"
+service_group_esc="$(esc "$SERVICE_GROUP")"
 env_file_esc="$(esc "$ENV_FILE")"
 app_host_esc="$(esc "$APP_HOST")"
 app_port_esc="$(esc "$APP_PORT")"
@@ -174,6 +178,7 @@ sed \
   -e "s/__APP_DIR__/${app_dir_esc}/g" \
   -e "s/__VENV_PATH__/${venv_path_esc}/g" \
   -e "s/__SERVICE_USER__/${service_user_esc}/g" \
+  -e "s/__SERVICE_GROUP__/${service_group_esc}/g" \
   -e "s/__ENV_FILE__/${env_file_esc}/g" \
   -e "s/__APP_HOST__/${app_host_esc}/g" \
   -e "s/__APP_PORT__/${app_port_esc}/g" \

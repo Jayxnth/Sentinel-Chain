@@ -204,6 +204,10 @@ The script will:
 - apply schema from SQLAlchemy models,
 - install/restart `sentinel-api.service`.
 
+The service template sets `HOME` to `__APP_DIR__` so runtime libraries do not try to
+read PostgreSQL client key defaults from `/home/<service-user>/.postgresql` (which is
+blocked by `ProtectHome=true`).
+
 ---
 
 ## 8. Applying schema directly from SQLAlchemy models

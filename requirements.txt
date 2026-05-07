@@ -18,3 +18,5 @@ requests
 pytest
 pytest-asyncio
 httpx
+aiofiles
+

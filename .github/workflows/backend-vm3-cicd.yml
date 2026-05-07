@@ -1,0 +1,163 @@
+name: Backend VM3 CI/CD
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      app_dir:
+        description: "Deployment directory on VM3"
+        required: false
+        default: "/opt/sentinel-chain"
+      venv_path:
+        description: "Virtualenv path on VM3"
+        required: false
+        default: "/opt/sentinel-chain/.venv"
+      app_host:
+        description: "Uvicorn bind host"
+        required: false
+        default: "0.0.0.0"
+      app_port:
+        description: "Uvicorn bind port"
+        required: false
+        default: "8000"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-vm3-cicd-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    if: github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run backend tests
+        run: python -m pytest -q
+
+  deploy:
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref_name == 'main')
+    needs: tests
+    runs-on: ubuntu-latest
+    env:
+      VM_SSH_PORT: ${{ secrets.VM3_SSH_PORT || '22' }}
+      VM_SSH_PRIVATE_KEY: ${{ secrets.VM3_SSH_PRIVATE_KEY }}
+      VM_SSH_KNOWN_HOSTS: ${{ secrets.VM3_SSH_KNOWN_HOSTS }}
+      API_KEY: ${{ secrets.VM3_API_KEY }}
+      GOOGLE_API_KEY: ${{ secrets.VM3_GOOGLE_API_KEY }}
+      GEMINI_MODEL: ${{ secrets.VM3_GEMINI_MODEL || 'gemini-2.5-flash' }}
+      APP_DIR: ${{ github.event.inputs.app_dir || '/opt/sentinel-chain' }}
+      VENV_PATH: ${{ github.event.inputs.venv_path || '/opt/sentinel-chain/.venv' }}
+      APP_HOST: ${{ github.event.inputs.app_host || '0.0.0.0' }}
+      APP_PORT: ${{ github.event.inputs.app_port || '8000' }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Initialize deploy variables
+        run: |
+          VM_HOST="${{ secrets.VM3_HOST }}"
+          VM_SSH_USER="${{ secrets.VM3_SSH_USER }}"
+          VM3_DB_USER="${{ secrets.VM3_DB_USER }}"
+          VM3_DB_PASSWORD_RAW="${{ secrets.VM3_DB_PASSWORD_RAW }}"
+          VM3_DB_HOST="${{ secrets.VM3_DB_HOST }}"
+          VM3_DB_NAME="${{ secrets.VM3_DB_NAME }}"
+
+          if [ -z "$VM_HOST" ] || [ -z "$VM_SSH_USER" ]; then
+            echo "VM3_HOST and VM3_SSH_USER secrets must be configured." >&2
+            exit 1
+          fi
+          if [ -z "$VM3_DB_USER" ] || [ -z "$VM3_DB_PASSWORD_RAW" ] || [ -z "$VM3_DB_HOST" ] || [ -z "$VM3_DB_NAME" ]; then
+            echo "VM3_DB_USER, VM3_DB_PASSWORD_RAW, VM3_DB_HOST, and VM3_DB_NAME secrets must be configured." >&2
+            exit 1
+          fi
+          DATABASE_URL="$(VM3_DB_USER="$VM3_DB_USER" VM3_DB_PASSWORD_RAW="$VM3_DB_PASSWORD_RAW" VM3_DB_HOST="$VM3_DB_HOST" VM3_DB_NAME="$VM3_DB_NAME" python -c "import os; from urllib.parse import quote; print(f\"postgresql+asyncpg://{os.environ['VM3_DB_USER']}:{quote(os.environ['VM3_DB_PASSWORD_RAW'], safe='')}@{os.environ['VM3_DB_HOST']}:5432/{os.environ['VM3_DB_NAME']}\")")"
+
+          {
+            echo "VM_HOST=$VM_HOST"
+            echo "VM_SSH_USER=$VM_SSH_USER"
+            echo "DATABASE_URL=$DATABASE_URL"
+          } >> "$GITHUB_ENV"
+
+      - name: Prepare SSH
+        run: |
+          install -m 700 -d ~/.ssh
+          install -m 600 /dev/null ~/.ssh/id_vm3
+          printf '%s\n' "$VM_SSH_PRIVATE_KEY" > ~/.ssh/id_vm3
+          install -m 600 /dev/null ~/.ssh/known_hosts
+          printf '%s\n' "$VM_SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Package repository for deployment
+        run: |
+          set +e
+          tar --exclude-vcs \
+              --exclude='.venv' \
+              --exclude='__pycache__' \
+              --exclude='.pytest_cache' \
+              --exclude='chroma_db' \
+              --exclude='sentinel-chain.tar.gz' \
+              -czf sentinel-chain.tar.gz .
+          tar_exit=$?
+          set -e
+
+          if [ "$tar_exit" -gt 1 ]; then
+            exit "$tar_exit"
+          fi
+
+      - name: Upload package to VM3
+        run: |
+          scp -P "$VM_SSH_PORT" -i ~/.ssh/id_vm3 sentinel-chain.tar.gz "$VM_SSH_USER@$VM_HOST:/tmp/sentinel-chain.tar.gz"
+
+      - name: Deploy on VM3
+        run: |
+          API_KEY_B64="$(printf '%s' "$API_KEY" | base64 -w 0)"
+          GOOGLE_API_KEY_B64="$(printf '%s' "$GOOGLE_API_KEY" | base64 -w 0)"
+          GEMINI_MODEL_B64="$(printf '%s' "$GEMINI_MODEL" | base64 -w 0)"
+
+          ssh -p "$VM_SSH_PORT" -i ~/.ssh/id_vm3 "$VM_SSH_USER@$VM_HOST" \
+            "sudo APP_DIR='$APP_DIR' VENV_PATH='$VENV_PATH' APP_HOST='$APP_HOST' APP_PORT='$APP_PORT' DATABASE_URL='$DATABASE_URL' API_KEY_B64='$API_KEY_B64' GOOGLE_API_KEY_B64='$GOOGLE_API_KEY_B64' GEMINI_MODEL_B64='$GEMINI_MODEL_B64' /bin/bash -s" <<'EOF'
+          set -euo pipefail
+
+          API_KEY="$(printf '%s' "$API_KEY_B64" | base64 -d)"
+          GOOGLE_API_KEY="$(printf '%s' "$GOOGLE_API_KEY_B64" | base64 -d)"
+          GEMINI_MODEL="$(printf '%s' "$GEMINI_MODEL_B64" | base64 -d)"
+
+          mkdir -p "$APP_DIR"
+          tar -xzf /tmp/sentinel-chain.tar.gz -C "$APP_DIR" --strip-components=1
+          rm -f /tmp/sentinel-chain.tar.gz
+          chmod +x "$APP_DIR/fast-api-deploy/deploy.sh"
+
+          "$APP_DIR/fast-api-deploy/deploy.sh" \
+            --app-dir "$APP_DIR" \
+            --venv-path "$VENV_PATH" \
+            --database-url "$DATABASE_URL" \
+            --api-key "$API_KEY" \
+            --google-api-key "$GOOGLE_API_KEY" \
+            --gemini-model "$GEMINI_MODEL" \
+            --host "$APP_HOST" \
+            --port "$APP_PORT"
+          EOF
+
+      - name: Smoke test backend on VM3
+        run: |
+          ssh -p "$VM_SSH_PORT" -i ~/.ssh/id_vm3 "$VM_SSH_USER@$VM_HOST" \
+            "set -euo pipefail; response=\$(curl --fail --silent --show-error --retry 10 --retry-delay 3 --max-time 10 'http://127.0.0.1:$APP_PORT/health'); echo \"\$response\"; echo \"\$response\" | grep -Eq '\"status\"[[:space:]]*:[[:space:]]*\"ok\"'"

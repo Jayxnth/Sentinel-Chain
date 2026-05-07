@@ -62,7 +62,6 @@ jobs:
       VM_SSH_PORT: ${{ secrets.VM3_SSH_PORT || '22' }}
       VM_SSH_PRIVATE_KEY: ${{ secrets.VM3_SSH_PRIVATE_KEY }}
       VM_SSH_KNOWN_HOSTS: ${{ secrets.VM3_SSH_KNOWN_HOSTS }}
-      DATABASE_URL: ${{ secrets.VM3_DATABASE_URL }}
       API_KEY: ${{ secrets.VM3_API_KEY }}
       GOOGLE_API_KEY: ${{ secrets.VM3_GOOGLE_API_KEY }}
       GEMINI_MODEL: ${{ secrets.VM3_GEMINI_MODEL || 'gemini-2.5-flash' }}
@@ -78,9 +77,17 @@ jobs:
         run: |
           VM_HOST="${{ secrets.VM3_HOST }}"
           VM_SSH_USER="${{ secrets.VM3_SSH_USER }}"
+          VM3_DB_USER="${{ secrets.VM3_DB_USER }}"
+          VM3_DB_PASSWORD_RAW="${{ secrets.VM3_DB_PASSWORD_RAW }}"
+          VM3_DB_HOST="${{ secrets.VM3_DB_HOST }}"
+          VM3_DB_NAME="${{ secrets.VM3_DB_NAME }}"
 
           if [ -z "$VM_HOST" ] || [ -z "$VM_SSH_USER" ]; then
             echo "VM3_HOST and VM3_SSH_USER secrets must be configured." >&2
+            exit 1
+          fi
+          if [ -z "$VM3_DB_USER" ] || [ -z "$VM3_DB_PASSWORD_RAW" ] || [ -z "$VM3_DB_HOST" ] || [ -z "$VM3_DB_NAME" ]; then
+            echo "VM3_DB_USER, VM3_DB_PASSWORD_RAW, VM3_DB_HOST, and VM3_DB_NAME secrets must be configured." >&2
             exit 1
           fi
 
@@ -120,16 +127,15 @@ jobs:
 
       - name: Deploy on VM3
         run: |
-          DB_B64="$(printf '%s' "$DATABASE_URL" | base64 -w 0)"
+          DATABASE_URL="$(VM3_DB_USER='${{ secrets.VM3_DB_USER }}' VM3_DB_PASSWORD_RAW='${{ secrets.VM3_DB_PASSWORD_RAW }}' VM3_DB_HOST='${{ secrets.VM3_DB_HOST }}' VM3_DB_NAME='${{ secrets.VM3_DB_NAME }}' python -c "import os; from urllib.parse import quote; print(f\"postgresql+asyncpg://{os.environ['VM3_DB_USER']}:{quote(os.environ['VM3_DB_PASSWORD_RAW'], safe='')}@{os.environ['VM3_DB_HOST']}:5432/{os.environ['VM3_DB_NAME']}\")")"
           API_KEY_B64="$(printf '%s' "$API_KEY" | base64 -w 0)"
           GOOGLE_API_KEY_B64="$(printf '%s' "$GOOGLE_API_KEY" | base64 -w 0)"
           GEMINI_MODEL_B64="$(printf '%s' "$GEMINI_MODEL" | base64 -w 0)"
 
           ssh -p "$VM_SSH_PORT" -i ~/.ssh/id_vm3 "$VM_SSH_USER@$VM_HOST" \
-            "sudo APP_DIR='$APP_DIR' VENV_PATH='$VENV_PATH' APP_HOST='$APP_HOST' APP_PORT='$APP_PORT' DB_B64='$DB_B64' API_KEY_B64='$API_KEY_B64' GOOGLE_API_KEY_B64='$GOOGLE_API_KEY_B64' GEMINI_MODEL_B64='$GEMINI_MODEL_B64' /bin/bash -s" <<'EOF'
+            "sudo APP_DIR='$APP_DIR' VENV_PATH='$VENV_PATH' APP_HOST='$APP_HOST' APP_PORT='$APP_PORT' DATABASE_URL='$DATABASE_URL' API_KEY_B64='$API_KEY_B64' GOOGLE_API_KEY_B64='$GOOGLE_API_KEY_B64' GEMINI_MODEL_B64='$GEMINI_MODEL_B64' /bin/bash -s" <<'EOF'
           set -euo pipefail
 
-          DATABASE_URL="$(printf '%s' "$DB_B64" | base64 -d)"
           API_KEY="$(printf '%s' "$API_KEY_B64" | base64 -d)"
           GOOGLE_API_KEY="$(printf '%s' "$GOOGLE_API_KEY_B64" | base64 -d)"
           GEMINI_MODEL="$(printf '%s' "$GEMINI_MODEL_B64" | base64 -d)"

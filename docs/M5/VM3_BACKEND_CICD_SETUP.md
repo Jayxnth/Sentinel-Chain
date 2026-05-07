@@ -103,7 +103,7 @@ Examples:
 - Remote/TLS-required postgres:
   `postgresql+asyncpg://sentinel_app:<ENCODED_PASSWORD>@db.example.com:5432/sentinel_chain?ssl=require`
 
-Use URL encoding for special characters in passwords.
+Use URL encoding for special characters in passwords. In CI/CD, this repository reads DB parts directly from the `VM3_DB_*` GitHub secrets and URL-encodes `VM3_DB_PASSWORD_RAW` in the deploy step before assembling `DATABASE_URL`.
 
 ---
 
@@ -124,7 +124,10 @@ gh secret set VM3_SSH_USER --body "<SSH_USERNAME>"
 gh secret set VM3_SSH_PORT --body "22"
 gh secret set VM3_SSH_PRIVATE_KEY --body "$(cat ~/.ssh/<private_key_file>)"
 gh secret set VM3_SSH_KNOWN_HOSTS --body "$(ssh-keyscan -H <VM3_IP_OR_DNS> 2>/dev/null)"
-gh secret set VM3_DATABASE_URL --body "postgresql+asyncpg://sentinel_app:<ENCODED_PASSWORD>@127.0.0.1:5432/sentinel_chain"
+gh secret set VM3_DB_USER --body "sentinel_app"
+gh secret set VM3_DB_PASSWORD_RAW --body "<RAW_DATABASE_PASSWORD>"
+gh secret set VM3_DB_HOST --body "127.0.0.1"
+gh secret set VM3_DB_NAME --body "sentinel_chain"
 gh secret set VM3_API_KEY --body "<SENTINEL_BACKEND_API_KEY>"
 gh secret set VM3_GOOGLE_API_KEY --body "<GOOGLE_API_KEY>"
 gh secret set VM3_GEMINI_MODEL --body "gemini-2.5-flash"
@@ -149,7 +152,7 @@ Triggers:
 
 Stages:
 1. **tests**: `pytest -q backend/tests`
-2. **deploy** (push/manual only): copies repository tarball to VM3 and runs `fast-api-deploy/deploy.sh`.
+2. **deploy** (push/manual only): copies repository tarball to VM3, builds `DATABASE_URL` from `VM3_DB_*` secrets (with Python URL encoding), and runs `fast-api-deploy/deploy.sh` to write that resolved `DATABASE_URL` into the service env file.
 
 It does not run on `main`.
 

@@ -3,10 +3,10 @@ name: Backend VM3 CI/CD
 on:
   push:
     branches:
-      - feat/fastapi-scaffold
+      - main
   pull_request:
     branches:
-      - feat/fastapi-scaffold
+      - main
   workflow_dispatch:
     inputs:
       app_dir:
@@ -35,7 +35,7 @@ concurrency:
 
 jobs:
   tests:
-    if: github.ref_name == 'feat/fastapi-scaffold'
+    if: github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -55,7 +55,7 @@ jobs:
         run: python -m pytest -q
 
   deploy:
-    if: github.ref_name == 'feat/fastapi-scaffold' && github.event_name != 'pull_request'
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref_name == 'main')
     needs: tests
     runs-on: ubuntu-latest
     env:

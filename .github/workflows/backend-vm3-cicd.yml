@@ -90,10 +90,12 @@ jobs:
             echo "VM3_DB_USER, VM3_DB_PASSWORD_RAW, VM3_DB_HOST, and VM3_DB_NAME secrets must be configured." >&2
             exit 1
           fi
+          DATABASE_URL="$(VM3_DB_USER="$VM3_DB_USER" VM3_DB_PASSWORD_RAW="$VM3_DB_PASSWORD_RAW" VM3_DB_HOST="$VM3_DB_HOST" VM3_DB_NAME="$VM3_DB_NAME" python -c "import os; from urllib.parse import quote; print(f\"postgresql+asyncpg://{os.environ['VM3_DB_USER']}:{quote(os.environ['VM3_DB_PASSWORD_RAW'], safe='')}@{os.environ['VM3_DB_HOST']}:5432/{os.environ['VM3_DB_NAME']}\")")"
 
           {
             echo "VM_HOST=$VM_HOST"
             echo "VM_SSH_USER=$VM_SSH_USER"
+            echo "DATABASE_URL=$DATABASE_URL"
           } >> "$GITHUB_ENV"
 
       - name: Prepare SSH
@@ -127,7 +129,6 @@ jobs:
 
       - name: Deploy on VM3
         run: |
-          DATABASE_URL="$(VM3_DB_USER='${{ secrets.VM3_DB_USER }}' VM3_DB_PASSWORD_RAW='${{ secrets.VM3_DB_PASSWORD_RAW }}' VM3_DB_HOST='${{ secrets.VM3_DB_HOST }}' VM3_DB_NAME='${{ secrets.VM3_DB_NAME }}' python -c "import os; from urllib.parse import quote; print(f\"postgresql+asyncpg://{os.environ['VM3_DB_USER']}:{quote(os.environ['VM3_DB_PASSWORD_RAW'], safe='')}@{os.environ['VM3_DB_HOST']}:5432/{os.environ['VM3_DB_NAME']}\")")"
           API_KEY_B64="$(printf '%s' "$API_KEY" | base64 -w 0)"
           GOOGLE_API_KEY_B64="$(printf '%s' "$GOOGLE_API_KEY" | base64 -w 0)"
           GEMINI_MODEL_B64="$(printf '%s' "$GEMINI_MODEL" | base64 -w 0)"

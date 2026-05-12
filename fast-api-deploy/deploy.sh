@@ -188,3 +188,5 @@ chmod 644 "$service_target"
 systemctl daemon-reload
 systemctl enable "$SERVICE_NAME"
 systemctl restart "$SERVICE_NAME"
+cp $env_file_esc "$app_dir_esc/.env"
+

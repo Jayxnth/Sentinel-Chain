@@ -187,6 +187,19 @@ sed \
 chmod 644 "$service_target"
 systemctl daemon-reload
 systemctl enable "$SERVICE_NAME"
+cp "$ENV_FILE" "$APP_DIR/.env"
 systemctl restart "$SERVICE_NAME"
-cp $env_file_esc "$app_dir_esc/.env"
 
+for _ in {1..20}; do
+  if systemctl is-active --quiet "$SERVICE_NAME"; then
+    break
+  fi
+  sleep 2
+done
+
+if ! systemctl is-active --quiet "$SERVICE_NAME"; then
+  echo "Service $SERVICE_NAME failed to become active." >&2
+  systemctl status "$SERVICE_NAME" --no-pager >&2
+  journalctl -u "$SERVICE_NAME" -n 100 --no-pager >&2
+  exit 1
+fi

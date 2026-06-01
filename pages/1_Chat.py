@@ -34,11 +34,15 @@ def ask(prompt: str) -> None:
     st.session_state["messages"].append(user_message)
 
     try:
+        history = [
+            {"role": m["role"], "content": m["content"]}
+            for m in st.session_state["messages"][-8:]
+        ]
         result = SentinelApi(config).query(
             prompt,
             source_vm=st.session_state["chat_source_vm"],
             log_type=st.session_state["chat_log_type"],
-            history=st.session_state["messages"][-8:],
+            history=history,
         )
         assistant_message = {
             "role": "assistant",

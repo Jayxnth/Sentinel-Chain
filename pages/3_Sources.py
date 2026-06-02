@@ -56,7 +56,8 @@ else:
 st.subheader("Recent Batches")
 if batches:
     table = pd.DataFrame(batches)
-    table["ts"] = table["ts"].apply(safe_ts)
+    if "ts" in table:
+        table["ts"] = table["ts"].apply(safe_ts)
     st.dataframe(table, use_container_width=True, hide_index=True)
 else:
     st.info("No batches available.")

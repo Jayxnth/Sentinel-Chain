@@ -438,8 +438,11 @@ def apply_theme() -> None:
 
 
 def badge(label: Any, kind: str | None = None) -> str:
-    text = html.escape(str(label or "UNKNOWN"))
-    normalized = str(kind or label or "").lower()
+    raw = str(label or "UNKNOWN")
+    # Backend may return extended strings like "CRITICAL, due to..." — extract the keyword only.
+    keyword = raw.split(",")[0].strip()
+    text = html.escape(keyword)
+    normalized = str(kind or label or "").split(",")[0].strip().lower()
     if normalized == "verified":
         cls = "sc-badge-ok"
     elif normalized == "tampered":

@@ -70,7 +70,7 @@ set `SENTINEL_API_URL`, `SENTINEL_API_KEY`, `SENTINEL_DATA_SOURCE`, and
 
 ## Live demo
 
-The demo backend runs on VM3 (M5) at `http://138.68.93.66:8000`. The dashboard's
+The demo backend runs on VM3 (M5) at `http://xx.xx.xx.xx:8000`. The dashboard's
 default `Live` mode points there. Health: `GET /health` should return
 `{"status":"ok"}`. The demo API key is shared in the team channel; it does not live
 in this repo.

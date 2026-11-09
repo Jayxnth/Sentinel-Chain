@@ -56,7 +56,8 @@ jobs:
         run: python -m pytest -q
 
   deploy:
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'feat/fastapi-scaffold'))
+    # Deploy only when triggered manually; the capstone VM is not kept running.
+    if: github.event_name == 'workflow_dispatch'
     needs: tests
     runs-on: ubuntu-latest
     env:

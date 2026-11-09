@@ -61,7 +61,7 @@ def sidebar_config() -> ApiConfig:
         st.session_state["theme_light_pref"] = light_mode
         st.session_state["ui_theme"] = "Light" if light_mode else "Dark"
         st.divider()
-        default_url = os.getenv("SENTINEL_API_URL") or _secret("SENTINEL_API_URL", "http://138.68.93.66:8000")
+        default_url = os.getenv("SENTINEL_API_URL") or _secret("SENTINEL_API_URL", "http://localhost:8000")
         default_key = os.getenv("SENTINEL_API_KEY") or os.getenv("API_KEY") or _secret("SENTINEL_API_KEY", "")
         default_mode = os.getenv("SENTINEL_DATA_SOURCE", _secret("SENTINEL_DATA_SOURCE", "Live"))
         source_param = (_query_value("source") or "").lower()

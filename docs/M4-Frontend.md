@@ -7,19 +7,19 @@ source .venv/bin/activate
 streamlit run app.py
 ```
 
-The dashboard now defaults to the live VM3 backend. Use the sidebar to confirm:
+The dashboard defaults to a local backend (`http://localhost:8000`). Use the sidebar to confirm or change it:
 
 - `Theme`: `Dark` or `Light`
 - `Data source`: `Live`
-- `FastAPI URL`: `http://138.68.93.66:8000`
+- `FastAPI URL`: `http://localhost:8000` (or your own deployment)
 - `API key`: the same value as backend `API_KEY`.
 
 For local testing, you can also launch with environment variables:
 
 ```bash
 SENTINEL_DATA_SOURCE=Live \
-SENTINEL_API_URL=http://138.68.93.66:8000 \
-SENTINEL_API_KEY=Sentinel2026 \
+SENTINEL_API_URL=http://localhost:8000 \
+SENTINEL_API_KEY=<your-api-key> \
 SENTINEL_UI_THEME=Dark \
 .venv/bin/streamlit run app.py
 ```

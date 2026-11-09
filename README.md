@@ -24,6 +24,16 @@ The system is split into three layers:
 The AI core (M1) provides the embedding + retrieval + Gemini analysis pipeline used by
 the backend's `/ingest` and `/query` paths.
 
+## My contribution (Shiva Jayanth, M1: AI core)
+
+I built the AI core with my four teammates building the backend, agents, dashboard and infrastructure:
+
+- [`ingest.py`](ingest.py): reads log files, extracts metadata, and embeds log content into ChromaDB (HuggingFace `all-MiniLM-L6-v2` embeddings via LangChain).
+- [`analyze.py`](analyze.py): retrieval plus Gemini analysis that returns a structured threat report (summary, severity, findings, recommendations) validated with a Pydantic schema.
+- [`chat.py`](chat.py): the natural-language query pipeline over the ingested logs, including filter extraction from the question.
+
+The backend calls these modules on its `/ingest` and `/query` paths.
+
 ## Tech stack
 
 - **API:** FastAPI, Uvicorn, Pydantic
@@ -68,12 +78,13 @@ The dashboard's sidebar accepts the backend URL and API key at runtime. Alternat
 set `SENTINEL_API_URL`, `SENTINEL_API_KEY`, `SENTINEL_DATA_SOURCE`, and
 `SENTINEL_UI_THEME` in `.env`.
 
-## Live demo
+## Deployment
 
-The demo backend runs on VM3 (M5) at `http://xx.xx.xx.xx:8000`. The dashboard's
-default `Live` mode points there. Health: `GET /health` should return
-`{"status":"ok"}`. The demo API key is shared in the team channel; it does not live
-in this repo.
+During the capstone the backend ran on a cloud VM (VM3) deployed through GitHub Actions.
+The address is not published here. To try the platform, run the backend locally as shown
+in the quick start; the dashboard defaults to `http://localhost:8000`. Health check:
+`GET /health` returns `{"status":"ok"}`. The API key is chosen by whoever runs the
+backend (`API_KEY` in `.env`) and is never stored in this repo.
 
 ## Running tests
 
@@ -103,12 +114,12 @@ UI at `http://localhost:8000/docs` and a raw schema at `/openapi.json`.
 | M2: Backend | `backend/`. FastAPI routes, async SQLAlchemy models, hash-chain integrity engine, AI orchestration on `/ingest` and `/upload`. |
 | M3: Agents | `agent/`. Edge agent, log simulator, tamper script targeting the live deployment. |
 | M4: Frontend | `app.py`, `pages/`, `frontend/`. Streamlit dashboard, mock-data fixtures, PDF/CSV exports. |
-| M5: Infra | VM3 hosting, PostgreSQL provisioning, backend deployment at `138.68.93.66:8000`. |
+| M5: Infra | VM3 hosting, PostgreSQL provisioning, backend deployment on a cloud VM. |
 
 ## Project status
 
-MVP target: 2 May 2026. As of late April 2026, the backend (M2) endpoints are
-implemented and tested, the AI analysis and NLP query pipeline is functional, the
-dashboard (M4) is merged and pointed at the live backend, and VM3 is deployed. Final
-integration testing and tamper detection demo are pending. The seven committed MVP
-user stories (US01-US07) plus US08 (PDF/CSV export) are wired end-to-end.
+Completed university capstone, June 2026. Working end to end: the FastAPI backend with
+the hash-chain integrity engine, the AI analysis and natural-language query pipeline,
+the Streamlit dashboard (overview, threat reports, VM activity, integrity status, chat
+with citations, PDF/CSV export), the edge agent with log simulator and tamper script,
+and a 29-test backend suite.

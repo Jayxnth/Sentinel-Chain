@@ -9,7 +9,7 @@ import requests
 from frontend import mock_data
 
 
-DEFAULT_API_URL = os.getenv("SENTINEL_API_URL", "http://138.68.93.66:8000")
+DEFAULT_API_URL = os.getenv("SENTINEL_API_URL", "http://localhost:8000")
 
 
 class ApiError(RuntimeError):
